@@ -17,6 +17,7 @@
       margin-bottom: 2rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       height: 250px;
+      width: 650px;
       display: flex;
       flex-direction: row;
       align-items: stretch;
@@ -128,9 +129,9 @@
       rows.forEach(row => {
         const entry = Object.fromEntries(header.map((h, i) => [h, row[i]]));
         const localDate = new Date(entry.Date);
-        const date = localDate.getFullYear() + "-" + String(localDate.getMonth() + 1).padStart(2, '0') + "-" + String(localDate.getDate()).padStart(2, '0');
-        if (!groups[date]) groups[date] = [];
-        groups[date].push(entry);
+        const localDateStr = localDate.toLocaleDateString('en-CA');
+        if (!groups[localDateStr]) groups[localDateStr] = [];
+        groups[localDateStr].push(entry);
       });
       return groups;
     }
@@ -147,7 +148,7 @@
       const mainChartId = `mainChart${index}`;
       const donutIds = metrics.filter(m => m.field !== 'kCal').map((m, i) => `donut${index}_${i}`);
 
-      const title = `<h2>${new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })}</h2>`;
+      const title = `<h2>${new Date(dateStr + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })}</h2>`;
       const table = `
         <div class="macro-table">
           ${title}
@@ -186,7 +187,7 @@
       document.getElementById("container").appendChild(card);
 
       const grouped = {};
-      mealLabels.forEach((label, i) => grouped[label] = 0);
+      mealLabels.forEach(label => grouped[label] = 0);
       entries.forEach(e => {
         if (grouped[e.Period] !== undefined) {
           grouped[e.Period] += +e.kCal * +e.Qty;
