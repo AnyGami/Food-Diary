@@ -16,15 +16,19 @@
       padding: 1rem;
       margin-bottom: 2rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      height: 250px;
-      width: 650px;
+      height: auto;
+      max-height: 100%;
+      width: 100%;
+      max-width: 650px;
       display: flex;
       flex-direction: row;
+      flex-wrap: wrap;
       align-items: stretch;
     }
     .main-chart {
-      width: 250px;
-      height: 100%;
+      width: 100%;
+      max-width: 250px;
+      height: 250px;
       flex-shrink: 0;
       position: relative;
     }
@@ -37,6 +41,7 @@
       display: flex;
       flex-direction: column;
       padding-left: 1rem;
+      min-width: 300px;
     }
     .macro-table {
       width: 100%;
@@ -58,10 +63,12 @@
       display: flex;
       justify-content: space-around;
       align-items: center;
+      flex-wrap: wrap;
     }
     .bottom-row canvas {
       width: 90px !important;
       height: 90px !important;
+      margin: 0.5rem;
     }
     .legend-row {
       display: flex;
@@ -85,11 +92,23 @@
       font-size: 0.9rem;
       text-align: center;
       margin: 0.2rem 0;
+      width: 100%;
+    }
+    @media (max-width: 768px) {
+      .card {
+        flex-direction: column;
+        align-items: center;
+      }
+      .details {
+        padding-left: 0;
+        padding-top: 1rem;
+      }
     }
   </style>
 </head>
 <body>
   <div id="container"></div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const URL = "https://script.google.com/macros/s/AKfycbz7hlW1glh_MVfOsL3ZsinhMWmOveIlUfjxch8GUbTjkxEEJOTAgzSMGR1FK3_RmmnEHA/exec";
     const goals = { kCal: 2100, P: 210.0, C: 105.0, F: 93.3, Salt: 1500 };
@@ -142,6 +161,7 @@
       entries.forEach(e => {
         metrics.forEach(m => totals[m.field] += +e[m.field] * +e.Qty);
       });
+
       const card = document.createElement('div');
       card.className = 'card';
 
