@@ -210,28 +210,31 @@
         }
       });
 
-      metrics.filter(m => m.field !== 'kCal').forEach((m, i) => {
+      metrics.filter(m => m.field !== 'kCal').forEach((metric, i) => {
         const mealGroup = {};
         mealLabels.forEach(label => mealGroup[label] = 0);
         entries.forEach(e => {
           if (mealGroup[e.Period] !== undefined) {
-            mealGroup[e.Period] += +e[m.field] * +e.Qty;
+            mealGroup[e.Period] += +e[metric.field] * +e.Qty;
           }
         });
+
+        const totalPlanned = Object.values(mealGroup).reduce((a, b) => a + b, 0);
+        const remaining = Math.max(0, metric.goal - totalPlanned);
 
         new Chart(document.getElementById(donutIds[i]), {
           type: 'doughnut',
           data: {
-            labels: mealLabels,
+            labels: [...mealLabels, 'Remaining'],
             datasets: [{
-              data: mealLabels.map(m => mealGroup[m]),
-              backgroundColor: mealColors
+              data: [...mealLabels.map(m => mealGroup[m]), remaining],
+              backgroundColor: [...mealColors, '#d3d3d3']
             }]
           },
           options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            centerText: m.label,
+            centerText: metric.label,
             cutout: '75%'
           }
         });
