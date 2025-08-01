@@ -1,17 +1,255 @@
-<style>
-table { width:65%;}
-td {width:14%; text-align:center;}
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Macro Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f0f0f0;
+      padding: 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      height: 250px;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+    }
+    .main-chart {
+      width: 250px;
+      height: 100%;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .main-chart canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding-left: 1rem;
+    }
+    .macro-table {
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.2rem;
+      text-align: center;
+    }
+    th {
+      background: #f9f9f9;
+    }
+    .bottom-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+    .bottom-row canvas {
+      width: 90px !important;
+      height: 90px !important;
+    }
+    .legend-row {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      margin: 0.5rem 0;
+    }
+    .legend-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .legend-color {
+      width: 40px;
+      height: 15px;
+      margin-bottom: 4px;
+    }
+    .card h2 {
+      font-size: 0.9rem;
+      text-align: center;
+      margin: 0.2rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <script>
+    const URL = "https://script.google.com/macros/s/AKfycbz7hlW1glh_MVfOsL3ZsinhMWmOveIlUfjxch8GUbTjkxEEJOTAgzSMGR1FK3_RmmnEHA/exec";
+    const goals = { kCal: 2100, P: 210.0, C: 105.0, F: 93.3, Salt: 1500 };
+    const metrics = [
+      { field: "kCal", label: "Calories", goal: goals.kCal },
+      { field: "P", label: "Protein", goal: goals.P },
+      { field: "C", label: "Carbs", goal: goals.C },
+      { field: "F", label: "Fat", goal: goals.F },
+      { field: "Salt", label: "Salt", goal: goals.Salt }
+    ];
+    const mealLabels = ["Breakfast", "Lunch", "Snack", "Dinner", "Drinks", "L-Night"];
+    const mealColors = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc949"];
 
+    const centerTextPlugin = {
+      id: 'centerText',
+      beforeDraw(chart) {
+        const ctx = chart.ctx;
+        const width = chart.width;
+        const height = chart.height;
+        const text = chart.config.options.centerText || "";
+        if (!text) return;
+        ctx.save();
+        ctx.font = `bold ${Math.min(height / 10, 14)}px sans-serif`;
+        ctx.fillStyle = "#333";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, width / 2, height / 2);
+        ctx.restore();
+      }
+    };
+    Chart.register(centerTextPlugin);
 
- <table>
-    <tr>
-    <td style="background-color:#4e79a7">&nbsp;<br></td>
-    <td style="background-color:#f28e2b">&nbsp;<br></td>
-    <td style="background-color:#e15759">&nbsp;<br></td>
-    <td style="background-color:#76b7b2">&nbsp;<br></td>
-    <td style="background-color:#59a14f">&nbsp;<br></td>
-    <td style="background-color:#edc949">&nbsp;<br></td>
-    <td style="background-color:#d0d0d0">&nbsp;<br></td></tr>
-    <tr><td>Breakfast</td><td>Lunch</td><td>Snack</td><td>Dinner</td><td>Drinks</td><td>L-Night</td><td>Remaining</td></tr>
-    </table>
+    function groupByDate(data) {
+      const header = data[0];
+      const rows = data.slice(1).filter(row => row[0]);
+      const groups = {};
+      rows.forEach(row => {
+        const entry = Object.fromEntries(header.map((h, i) => [h, row[i]]));
+        const localDate = new Date(entry.Date);
+        const date = localDate.getFullYear() + "-" + String(localDate.getMonth() + 1).padStart(2, '0') + "-" + String(localDate.getDate()).padStart(2, '0');
+        if (!groups[date]) groups[date] = [];
+        groups[date].push(entry);
+      });
+      return groups;
+    }
+
+    function addCard(dateStr, entries, index) {
+      const totals = {};
+      metrics.forEach(m => totals[m.field] = 0);
+      entries.forEach(e => {
+        metrics.forEach(m => totals[m.field] += +e[m.field] * +e.Qty);
+      });
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const mainChartId = `mainChart${index}`;
+      const donutIds = metrics.filter(m => m.field !== 'kCal').map((m, i) => `donut${index}_${i}`);
+
+      const title = `<h2>${new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })}</h2>`;
+      const table = `
+        <div class="macro-table">
+          ${title}
+          <table>
+            <thead><tr><th>Type</th>${metrics.map(m => `<th>${m.label}</th>`).join('')}</tr></thead>
+            <tbody>
+              <tr><td>Goal</td>${metrics.map(m => `<td>${m.goal}</td>`).join('')}</tr>
+              <tr><td>Planned</td>${metrics.map(m => `<td>${totals[m.field].toFixed(1)}</td>`).join('')}</tr>
+              <tr><td>Remaining</td>${metrics.map(m => `<td>${(m.goal - totals[m.field]).toFixed(1)}</td>`).join('')}</tr>
+            </tbody>
+          </table>
+        </div>`;
+
+      const legend = `
+        <div class="legend-row">
+          ${mealLabels.map((m, i) => `
+            <div class="legend-item">
+              <div class="legend-color" style="background:${mealColors[i]}"></div>
+              <div>${m}</div>
+            </div>`).join('')}
+        </div>`;
+
+      const donuts = `
+        <div class="bottom-row">
+          ${metrics.filter(m => m.field !== 'kCal').map((m, i) => `<canvas id="${donutIds[i]}"></canvas>`).join('')}
+        </div>`;
+
+      card.innerHTML = `
+        <div class="main-chart"><canvas id="${mainChartId}"></canvas></div>
+        <div class="details">
+          ${table}
+          ${legend}
+          ${donuts}
+        </div>`;
+
+      document.getElementById("container").appendChild(card);
+
+      const grouped = {};
+      mealLabels.forEach((label, i) => grouped[label] = 0);
+      entries.forEach(e => {
+        if (grouped[e.Period] !== undefined) {
+          grouped[e.Period] += +e.kCal * +e.Qty;
+        }
+      });
+
+      new Chart(document.getElementById(mainChartId), {
+        type: 'doughnut',
+        data: {
+          labels: mealLabels,
+          datasets: [{
+            data: mealLabels.map(m => grouped[m]),
+            backgroundColor: mealColors
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          centerText: "Calories",
+          cutout: '75%'
+        }
+      });
+
+      metrics.filter(m => m.field !== 'kCal').forEach((m, i) => {
+        const mealGroup = {};
+        mealLabels.forEach(label => mealGroup[label] = 0);
+        entries.forEach(e => {
+          if (mealGroup[e.Period] !== undefined) {
+            mealGroup[e.Period] += +e[m.field] * +e.Qty;
+          }
+        });
+
+        new Chart(document.getElementById(donutIds[i]), {
+          type: 'doughnut',
+          data: {
+            labels: mealLabels,
+            datasets: [{
+              data: mealLabels.map(m => mealGroup[m]),
+              backgroundColor: mealColors
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            centerText: m.label,
+            cutout: '75%'
+          }
+        });
+      });
+    }
+
+    async function init() {
+      const res = await fetch(URL);
+      const data = await res.json();
+      const grouped = groupByDate(data);
+      Object.entries(grouped)
+        .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+        .forEach(([date, entries], i) => {
+          addCard(date, entries, i);
+        });
+    }
+
+    init();
+  </script>
+</body>
+</html>
